@@ -1,5 +1,6 @@
 package com.javarush.task.task39.task3913;
 
+import com.javarush.task.task39.task3913.query.DateQuery;
 import com.javarush.task.task39.task3913.query.IPQuery;
 import com.javarush.task.task39.task3913.query.UserQuery;
 
@@ -13,7 +14,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class LogParser implements IPQuery, UserQuery {
+public class LogParser implements IPQuery, UserQuery, DateQuery {
 
     private final Path logDir;
     private final Set<LogEntry> logs;
@@ -24,6 +25,89 @@ public class LogParser implements IPQuery, UserQuery {
         logs = new HashSet<>();
         df = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
         loadLogs();
+    }
+
+    @Override
+    public Set<Date> getDatesForUserAndEvent(String user, Event event, Date after, Date before) {
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.name.equals(user))
+                .filter(l -> l.event.equals(event))
+                .map(l -> l.date)
+                .collect(Collectors.toSet());
+    }
+
+    @Override
+    public Set<Date> getDatesWhenSomethingFailed(Date after, Date before) {
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.status.equals(Status.FAILED))
+                .map(l -> l.date)
+                .collect(Collectors.toSet());
+    }
+
+    @Override
+    public Set<Date> getDatesWhenErrorHappened(Date after, Date before) {
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.status.equals(Status.ERROR))
+                .map(l -> l.date)
+                .collect(Collectors.toSet());
+    }
+
+    @Override
+    public Date getDateWhenUserLoggedFirstTime(String user, Date after, Date before) {
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.name.equals(user))
+                .filter(l->l.status.equals(Status.OK))
+                .map(l -> l.date)
+                .collect(Collectors.toCollection(TreeSet::new))
+                .pollFirst();
+    }
+
+    @Override
+    public Date getDateWhenUserSolvedTask(String user, int task, Date after, Date before) {
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.name.equals(user))
+                .filter(l -> l.event.equals(Event.SOLVE_TASK))
+                .filter(l -> l.task == task)
+                .map(l -> l.date)
+                .collect(Collectors.toCollection(TreeSet::new))
+                .pollFirst();
+    }
+
+    @Override
+    public Date getDateWhenUserDoneTask(String user, int task, Date after, Date before) {
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.name.equals(user))
+                .filter(l -> l.event.equals(Event.DONE_TASK))
+                .filter(l -> l.task == task)
+                .map(l -> l.date)
+                .collect(Collectors.toCollection(TreeSet::new))
+                .pollFirst();
+    }
+
+    @Override
+    public Set<Date> getDatesWhenUserWroteMessage(String user, Date after, Date before) {
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.name.equals(user))
+                .filter(l -> l.event.equals(Event.WRITE_MESSAGE))
+                .map(l -> l.date)
+                .collect(Collectors.toSet());
+    }
+
+    @Override
+    public Set<Date> getDatesWhenUserDownloadedPlugin(String user, Date after, Date before) {
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.name.equals(user))
+                .filter(l -> l.event.equals(Event.DOWNLOAD_PLUGIN))
+                .map(l -> l.date)
+                .collect(Collectors.toSet());
     }
 
     @Override
