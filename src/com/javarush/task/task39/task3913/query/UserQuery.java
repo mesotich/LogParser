@@ -1,2 +1,5 @@
-package com.javarush.task.task39.task3913.query;public interface UserQuery {
+package com.javarush.task.task39.task3913.query;
+
+public interface UserQuery {
+
 }
