@@ -1,6 +1,7 @@
 package com.javarush.task.task39.task3913;
 
 import com.javarush.task.task39.task3913.query.DateQuery;
+import com.javarush.task.task39.task3913.query.EventQuery;
 import com.javarush.task.task39.task3913.query.IPQuery;
 import com.javarush.task.task39.task3913.query.UserQuery;
 
@@ -14,7 +15,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class LogParser implements IPQuery, UserQuery, DateQuery {
+public class LogParser implements IPQuery, UserQuery, DateQuery, EventQuery {
 
     private final Path logDir;
     private final Set<LogEntry> logs;
@@ -25,6 +26,101 @@ public class LogParser implements IPQuery, UserQuery, DateQuery {
         logs = new HashSet<>();
         df = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
         loadLogs();
+    }
+
+    @Override
+    public int getNumberOfAllEvents(Date after, Date before) {
+        return getAllEvents(after, before).size();
+    }
+
+    @Override
+    public Set<Event> getAllEvents(Date after, Date before) {
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .map(l -> l.event)
+                .collect(Collectors.toSet());
+    }
+
+    @Override
+    public Set<Event> getEventsForIP(String ip, Date after, Date before) {
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.ip.equals(ip))
+                .map(l -> l.event)
+                .collect(Collectors.toSet());
+    }
+
+    @Override
+    public Set<Event> getEventsForUser(String user, Date after, Date before) {
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.name.equals(user))
+                .map(l -> l.event)
+                .collect(Collectors.toSet());
+    }
+
+    @Override
+    public Set<Event> getFailedEvents(Date after, Date before) {
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.status.equals(Status.FAILED))
+                .map(l -> l.event)
+                .collect(Collectors.toSet());
+    }
+
+    @Override
+    public Set<Event> getErrorEvents(Date after, Date before) {
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.status.equals(Status.ERROR))
+                .map(l -> l.event)
+                .collect(Collectors.toSet());
+    }
+
+    @Override
+    public int getNumberOfAttemptToSolveTask(int task, Date after, Date before) {
+        return (int) logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.event.equals(Event.SOLVE_TASK))
+                .filter(l -> l.task == task)
+                .count();
+    }
+
+    @Override
+    public int getNumberOfSuccessfulAttemptToSolveTask(int task, Date after, Date before) {
+        return (int) logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.event.equals(Event.DONE_TASK))
+                .filter(l -> l.task == task)
+                .count();
+    }
+
+    @Override
+    public Map<Integer, Integer> getAllSolvedTasksAndTheirNumber(Date after, Date before) {
+        Map<Integer, Integer> result = new HashMap<>();
+        logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.event.equals(Event.SOLVE_TASK))
+                .forEach(l -> {
+                    int delta = (result.containsKey(l.task))
+                            ? result.get(l.task) + 1 : 1;
+                    result.put(l.task, delta);
+                });
+        return result;
+    }
+
+    @Override
+    public Map<Integer, Integer> getAllDoneTasksAndTheirNumber(Date after, Date before) {
+        Map<Integer, Integer> result = new HashMap<>();
+        logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.event.equals(Event.DONE_TASK))
+                .forEach(l -> {
+                    int delta = (result.containsKey(l.task))
+                            ? result.get(l.task) + 1 : 1;
+                    result.put(l.task, delta);
+                });
+        return result;
     }
 
     @Override
@@ -60,7 +156,7 @@ public class LogParser implements IPQuery, UserQuery, DateQuery {
         return logs.stream()
                 .filter(l -> l.betweenDates(after, before))
                 .filter(l -> l.name.equals(user))
-                .filter(l->l.status.equals(Status.OK))
+                .filter(l -> l.status.equals(Status.OK))
                 .map(l -> l.date)
                 .collect(Collectors.toCollection(TreeSet::new))
                 .pollFirst();
