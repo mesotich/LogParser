@@ -1,6 +1,7 @@
 package com.javarush.task.task39.task3913;
 
 import com.javarush.task.task39.task3913.query.IPQuery;
+import com.javarush.task.task39.task3913.query.UserQuery;
 
 import java.io.*;
 import java.nio.file.DirectoryStream;
@@ -12,7 +13,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class LogParser implements IPQuery {
+public class LogParser implements IPQuery, UserQuery {
 
     private final Path logDir;
     private final Set<LogEntry> logs;
@@ -23,6 +24,106 @@ public class LogParser implements IPQuery {
         logs = new HashSet<>();
         df = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
         loadLogs();
+    }
+
+    @Override
+    public Set<String> getAllUsers() {
+        return logs.stream()
+                .map(l -> l.name)
+                .collect(Collectors.toSet());
+    }
+
+    @Override
+    public int getNumberOfUsers(Date after, Date before) {
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .map(l -> l.name)
+                .collect(Collectors.toSet())
+                .size();
+    }
+
+    @Override
+    public int getNumberOfUserEvents(String user, Date after, Date before) {
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.name.equals(user))
+                .map(l -> l.event)
+                .collect(Collectors.toSet())
+                .size();
+    }
+
+    @Override
+    public Set<String> getUsersForIP(String ip, Date after, Date before) {
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.ip.equals(ip))
+                .map(l -> l.name)
+                .collect(Collectors.toSet());
+    }
+
+    @Override
+    public Set<String> getLoggedUsers(Date after, Date before) {
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.event.equals(Event.LOGIN))
+                .map(l -> l.name)
+                .collect(Collectors.toSet());
+    }
+
+    @Override
+    public Set<String> getDownloadedPluginUsers(Date after, Date before) {
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.event.equals(Event.DOWNLOAD_PLUGIN))
+                .map(l -> l.name)
+                .collect(Collectors.toSet());
+    }
+
+    @Override
+    public Set<String> getWroteMessageUsers(Date after, Date before) {
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.event.equals(Event.WRITE_MESSAGE))
+                .map(l -> l.name)
+                .collect(Collectors.toSet());
+    }
+
+    @Override
+    public Set<String> getSolvedTaskUsers(Date after, Date before) {
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.event.equals(Event.SOLVE_TASK))
+                .map(l -> l.name)
+                .collect(Collectors.toSet());
+    }
+
+    @Override
+    public Set<String> getSolvedTaskUsers(Date after, Date before, int task) {
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.event.equals(Event.SOLVE_TASK))
+                .filter(l -> l.task == task)
+                .map(l -> l.name)
+                .collect(Collectors.toSet());
+    }
+
+    @Override
+    public Set<String> getDoneTaskUsers(Date after, Date before) {
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.event.equals(Event.DONE_TASK))
+                .map(l -> l.name)
+                .collect(Collectors.toSet());
+    }
+
+    @Override
+    public Set<String> getDoneTaskUsers(Date after, Date before, int task) {
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.event.equals(Event.DONE_TASK))
+                .filter(l -> l.task == task)
+                .map(l -> l.name)
+                .collect(Collectors.toSet());
     }
 
     @Override
