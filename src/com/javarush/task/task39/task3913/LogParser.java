@@ -10,6 +10,7 @@ import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.stream.Collectors;
 
 public class LogParser implements IPQuery {
 
@@ -31,74 +32,53 @@ public class LogParser implements IPQuery {
 
     @Override
     public Set<String> getUniqueIPs(Date after, Date before) {
-        Set<String> result = new HashSet<>();
-        for (LogEntry le : logs
-        ) {
-            if (le.betweenDates(after, before))
-                result.add(le.ip);
-        }
-        return result;
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .map(l -> l.ip)
+                .collect(Collectors.toSet());
     }
 
     @Override
     public Set<String> getIPsForUser(String user, Date after, Date before) {
-        Set<String> result = new HashSet<>();
-        for (LogEntry le : logs
-        ) {
-            if (le.betweenDates(after, before) && le.name.equals(user))
-                result.add(le.ip);
-        }
-        return result;
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.name.equals(user))
+                .map(l -> l.ip)
+                .collect(Collectors.toSet());
     }
 
     @Override
     public Set<String> getIPsForEvent(Event event, Date after, Date before) {
-        Set<String> result = new HashSet<>();
-        for (LogEntry le : logs
-        ) {
-            if (le.betweenDates(after, before) && le.event.equals(event))
-                result.add(le.ip);
-        }
-        return result;
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.event.equals(event))
+                .map(l -> l.ip)
+                .collect(Collectors.toSet());
     }
 
     @Override
     public Set<String> getIPsForStatus(Status status, Date after, Date before) {
-        Set<String> result = new HashSet<>();
-        for (LogEntry le : logs
-        ) {
-            if (le.betweenDates(after, before) && le.status.equals(status))
-                result.add(le.ip);
-        }
-        return result;
+        return logs.stream()
+                .filter(l -> l.betweenDates(after, before))
+                .filter(l -> l.status.equals(status))
+                .map(l -> l.ip)
+                .collect(Collectors.toSet());
     }
 
     private void loadLogs() {
         Set<Path> set = getLogsFiles();
         LogEntry logEntry;
-        String status;
         String[] parts;
-        int task = 0;
         for (Path path : set
         ) {
             try (BufferedReader br = Files.newBufferedReader(path)) {
                 while (br.ready()) {
                     parts = br.readLine().split("\t");
-                    switch (parts.length) {
-                        case 5:
-                            status = parts[4];
-                            break;
-                        case 6:
-                            status = parts[5];
-                            task = Integer.parseInt(parts[4]);
-                            break;
-                        default:
-                            continue;
-                    }
-                    logEntry = new LogEntry(parts[0], parts[1], df.parse(parts[2]), Event.valueOf(parts[3])
-                            , task, Status.valueOf(status));
+                    if (parts.length != 5)
+                        continue;
+                    logEntry = new LogEntry(parts[0], parts[1], df.parse(parts[2]), getEvent(parts[3])
+                            , getTask(parts[3]), Status.valueOf(parts[4]));
                     logs.add(logEntry);
-                    task = 0;
                 }
             } catch (IOException | ParseException e) {
                 e.printStackTrace();
@@ -118,6 +98,26 @@ public class LogParser implements IPQuery {
             e.printStackTrace();
         }
         return result;
+    }
+
+    private Event getEvent(String eventString) {
+        for (Event event : Event.values()
+        ) {
+            if (eventString.contains(event.toString()))
+                return event;
+        }
+        return null;
+    }
+
+    private int getTask(String eventString) {
+        Event event = getEvent(eventString);
+        String string = "";
+        if (event == null)
+            return -1;
+        if (event.equals(Event.DONE_TASK) || event.equals(Event.SOLVE_TASK))
+            string = eventString.replaceAll(event.toString(), "").trim();
+        else return -1;
+        return Integer.parseInt(string);
     }
 
     private class LogEntry {
