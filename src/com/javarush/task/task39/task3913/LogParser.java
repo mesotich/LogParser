@@ -1,9 +1,6 @@
 package com.javarush.task.task39.task3913;
 
-import com.javarush.task.task39.task3913.query.DateQuery;
-import com.javarush.task.task39.task3913.query.EventQuery;
-import com.javarush.task.task39.task3913.query.IPQuery;
-import com.javarush.task.task39.task3913.query.UserQuery;
+import com.javarush.task.task39.task3913.query.*;
 
 import java.io.*;
 import java.nio.file.DirectoryStream;
@@ -15,7 +12,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class LogParser implements IPQuery, UserQuery, DateQuery, EventQuery {
+public class LogParser implements IPQuery, UserQuery, DateQuery, EventQuery, QLQuery {
 
     private final Path logDir;
     private final Set<LogEntry> logs;
@@ -24,8 +21,42 @@ public class LogParser implements IPQuery, UserQuery, DateQuery, EventQuery {
     public LogParser(Path logDir) {
         this.logDir = logDir;
         logs = new HashSet<>();
-        df = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
+        df = new SimpleDateFormat("d.M.yyyy H:m:s");
         loadLogs();
+    }
+
+    @Override
+    public Set<Object> execute(String query) {
+        switch (query) {
+            case "get ip":
+                return logs.stream()
+                        .map(l -> l.ip)
+                        .collect(Collectors.toSet());
+            case "get user":
+                return logs.stream()
+                        .map(l -> l.name)
+                        .collect(Collectors.toSet());
+            case "get date":
+                return logs.stream()
+                        .map(l -> l.date)
+                        .collect(Collectors.toSet());
+            case "get event":
+                return logs.stream()
+                        .map(l -> l.event)
+                        .collect(Collectors.toSet());
+            case "get status":
+                return logs.stream()
+                        .map(l -> l.status)
+                        .collect(Collectors.toSet());
+        }
+        String[] command = query.split(" ", 6);
+        System.out.println(command.length);
+        if (command.length != 6)
+            return new HashSet<>();
+        return logs.stream()
+                .filter(l -> getRecord(l, command[3]).equals(getValue(getRecord(l, command[3]), command[5])))
+                .map(l -> getRecord(l, command[1]))
+                .collect(Collectors.toSet());
     }
 
     @Override
@@ -401,6 +432,41 @@ public class LogParser implements IPQuery, UserQuery, DateQuery, EventQuery {
         return Integer.parseInt(string);
     }
 
+    private Object getRecord(LogEntry logEntry, String command) {
+        switch (command) {
+            case "ip":
+                return logEntry.ip;
+            case "user":
+                return logEntry.name;
+            case "date":
+                return logEntry.date;
+            case "event":
+                return logEntry.event;
+            case "status":
+                return logEntry.status;
+        }
+        return new Object();
+    }
+
+    private Object getValue(Object o, String value) {
+        value = value.substring(1, value.length() - 1);
+        Class<?> clazz = o.getClass();
+        if (clazz.equals(String.class))
+            return value;
+        if (clazz.equals(Date.class)) {
+            try {
+                return df.parse(value);
+            } catch (ParseException e) {
+                e.printStackTrace();
+            }
+        }
+        if (clazz.equals(Event.class))
+            return Event.valueOf(value);
+        if (clazz.equals(Status.class))
+            return Status.valueOf(value);
+        return "";
+    }
+
     private class LogEntry {
 
         private final String ip;
@@ -425,6 +491,22 @@ public class LogParser implements IPQuery, UserQuery, DateQuery, EventQuery {
             if (before == null)
                 before = new Date(Long.MAX_VALUE);
             return date.after(after) && date.before(before);
+        }
+
+        private String getStringRecord(String command) {
+            switch (command) {
+                case "ip":
+                    return ip;
+                case "user":
+                    return name;
+                case "date":
+                    return df.format(date);
+                case "event":
+                    return event.toString();
+                case "status":
+                    return status.toString();
+            }
+            return "";
         }
     }
 }
