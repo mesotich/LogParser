@@ -10,6 +10,8 @@ import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class LogParser implements IPQuery, UserQuery, DateQuery, EventQuery, QLQuery {
@@ -49,12 +51,22 @@ public class LogParser implements IPQuery, UserQuery, DateQuery, EventQuery, QLQ
                         .map(l -> l.status)
                         .collect(Collectors.toSet());
         }
-        String[] command = query.split(" ", 6);
-        System.out.println(command.length);
-        if (command.length != 6)
+        String[] command;
+        List<String> listValues = listValues(query);
+        command = query.split(" ", 5);
+        if (command.length != 5)
             return new HashSet<>();
-        return logs.stream()
-                .filter(l -> getRecord(l, command[3]).equals(getValue(getRecord(l, command[3]), command[5])))
+        Class<?> clazz = getRecord(logs.iterator().next(), command[3]).getClass();
+        Set<LogEntry> set = logs.stream()
+                .filter(l -> getRecord(l, command[3])
+                        .equals(getValue(clazz, listValues.get(0))))
+                .collect(Collectors.toSet());
+        if (listValues.size() == 3) {
+            set = set.stream()
+                    .filter(l -> l.betweenDates((Date) getValue(Date.class, listValues.get(1)), (Date) getValue(Date.class, listValues.get(2))))
+                    .collect(Collectors.toSet());
+        }
+        return set.stream()
                 .map(l -> getRecord(l, command[1]))
                 .collect(Collectors.toSet());
     }
@@ -448,9 +460,7 @@ public class LogParser implements IPQuery, UserQuery, DateQuery, EventQuery, QLQ
         return new Object();
     }
 
-    private Object getValue(Object o, String value) {
-        value = value.substring(1, value.length() - 1);
-        Class<?> clazz = o.getClass();
+    private Object getValue(Class<?> clazz, String value) {
         if (clazz.equals(String.class))
             return value;
         if (clazz.equals(Date.class)) {
@@ -465,6 +475,16 @@ public class LogParser implements IPQuery, UserQuery, DateQuery, EventQuery, QLQ
         if (clazz.equals(Status.class))
             return Status.valueOf(value);
         return "";
+    }
+
+    private List<String> listValues(String query) {
+        List<String> result = new ArrayList<>();
+        Pattern pattern1 = Pattern.compile("\".+?\"");
+        Matcher matcher = pattern1.matcher(query);
+        while (matcher.find()) {
+            result.add(query.substring(matcher.start() + 1, matcher.end() - 1));
+        }
+        return result;
     }
 
     private class LogEntry {
