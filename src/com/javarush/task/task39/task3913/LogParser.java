@@ -1,8 +1,12 @@
 package com.javarush.task.task39.task3913;
 
+import com.javarush.task.task39.task3913.commands.Command;
+import com.javarush.task.task39.task3913.commands.CommandStorage;
+import com.javarush.task.task39.task3913.commands.Storage;
 import com.javarush.task.task39.task3913.query.*;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.IOException;
 import java.nio.file.DirectoryStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -10,6 +14,7 @@ import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -19,6 +24,11 @@ public class LogParser implements IPQuery, UserQuery, DateQuery, EventQuery, QLQ
     private final Path logDir;
     private final Set<LogEntry> logs;
     private final DateFormat df;
+    private Storage storage;
+    private Set<Object> currentObjects;
+    private Set<LogEntry> currentLogs;
+    private LogEntry logEntry;
+    private Object field;
 
     public LogParser(Path logDir) {
         this.logDir = logDir;
@@ -27,48 +37,82 @@ public class LogParser implements IPQuery, UserQuery, DateQuery, EventQuery, QLQ
         loadLogs();
     }
 
+    public void initStorage() {
+        currentLogs = logs;
+        currentObjects = null;
+        field = null;
+        logEntry = currentLogs.iterator().next();
+        if (storage != null)
+            return;
+        storage = new CommandStorage();
+        storage.register("get ip", createGetCommand(l -> l.ip));
+        storage.register("get user", createGetCommand(l -> l.name));
+        storage.register("get date", createGetCommand(l -> l.date));
+        storage.register("get event", createGetCommand(l -> l.event));
+        storage.register("get status", createGetCommand(l -> l.status));
+        storage.register("ip", createCommand(l -> l.ip));
+        storage.register("user", createCommand(l -> l.name));
+        storage.register("date", createCommand(l -> l.date));
+        storage.register("event", createCommand(l -> l.event));
+        storage.register("status", createCommand(l -> l.status));
+    }
+
+    private Command createGetCommand(Function<LogEntry, Object> function) {
+        return () -> this.currentObjects = currentLogs.stream()
+                .map(function)
+                .collect(Collectors.toSet());
+    }
+
+    private Command createCommand(Function<LogEntry, Object> function) {
+        return () -> this.field = function.apply(logEntry);
+    }
+
+    private Object getValue(Class<?> clazz, String value) {
+        if (clazz.equals(String.class))
+            return value;
+        if (clazz.equals(Date.class)) {
+            try {
+                return df.parse(value);
+            } catch (ParseException e) {
+                e.printStackTrace();
+            }
+        }
+        if (clazz.equals(Event.class))
+            return Event.valueOf(value);
+        if (clazz.equals(Status.class))
+            return Status.valueOf(value);
+        return "";
+    }
+
     @Override
     public Set<Object> execute(String query) {
-        switch (query) {
-            case "get ip":
-                return logs.stream()
-                        .map(l -> l.ip)
-                        .collect(Collectors.toSet());
-            case "get user":
-                return logs.stream()
-                        .map(l -> l.name)
-                        .collect(Collectors.toSet());
-            case "get date":
-                return logs.stream()
-                        .map(l -> l.date)
-                        .collect(Collectors.toSet());
-            case "get event":
-                return logs.stream()
-                        .map(l -> l.event)
-                        .collect(Collectors.toSet());
-            case "get status":
-                return logs.stream()
-                        .map(l -> l.status)
-                        .collect(Collectors.toSet());
+        initStorage();
+        if (storage.containsQuery(query)) {
+            storage.execute(query);
+            return currentObjects;
         }
-        String[] command;
-        List<String> listValues = listValues(query);
-        command = query.split(" ", 5);
-        if (command.length != 5)
+        currentLogs = new HashSet<>();
+        String[] fields = query.split(" ", 5);
+        if (fields.length != 5)
             return new HashSet<>();
-        Class<?> clazz = getRecord(logs.iterator().next(), command[3]).getClass();
-        Set<LogEntry> set = logs.stream()
-                .filter(l -> getRecord(l, command[3])
-                        .equals(getValue(clazz, listValues.get(0))))
-                .collect(Collectors.toSet());
+        List<String> listValues = listValues(query);
+        logs.forEach(l -> {
+            logEntry = l;
+            storage.execute(fields[3]);
+            if (field.equals(getValue(field.getClass(), listValues.get(0)))) {
+                currentLogs.add(l);
+            }
+        });
         if (listValues.size() == 3) {
-            set = set.stream()
-                    .filter(l -> l.betweenDates((Date) getValue(Date.class, listValues.get(1)), (Date) getValue(Date.class, listValues.get(2))))
+            Date before = (Date) getValue(Date.class, listValues.get(1));
+            Date after = (Date) getValue(Date.class, listValues.get(2));
+            currentLogs = currentLogs.stream()
+                    .filter(l -> l.betweenDates(before, after))
                     .collect(Collectors.toSet());
         }
-        return set.stream()
-                .map(l -> getRecord(l, command[1]))
-                .collect(Collectors.toSet());
+        String getString = fields[0] + " " + fields[1];
+        storage.execute(getString);
+        return currentObjects;
     }
 
     @Override
@@ -460,23 +504,6 @@ public class LogParser implements IPQuery, UserQuery, DateQuery, EventQuery, QLQ
         return new Object();
     }
 
-    private Object getValue(Class<?> clazz, String value) {
-        if (clazz.equals(String.class))
-            return value;
-        if (clazz.equals(Date.class)) {
-            try {
-                return df.parse(value);
-            } catch (ParseException e) {
-                e.printStackTrace();
-            }
-        }
-        if (clazz.equals(Event.class))
-            return Event.valueOf(value);
-        if (clazz.equals(Status.class))
-            return Status.valueOf(value);
-        return "";
-    }
-
     private List<String> listValues(String query) {
         List<String> result = new ArrayList<>();
         Pattern pattern1 = Pattern.compile("\".+?\"");
@@ -487,7 +514,7 @@ public class LogParser implements IPQuery, UserQuery, DateQuery, EventQuery, QLQ
         return result;
     }
 
-    private class LogEntry {
+    public static class LogEntry {
 
         private final String ip;
         private final String name;
@@ -505,7 +532,7 @@ public class LogParser implements IPQuery, UserQuery, DateQuery, EventQuery, QLQ
             this.status = status;
         }
 
-        private boolean betweenDates(Date after, Date before) {
+        public boolean betweenDates(Date after, Date before) {
             if (after == null)
                 after = new Date(0L);
             if (before == null)
@@ -513,20 +540,8 @@ public class LogParser implements IPQuery, UserQuery, DateQuery, EventQuery, QLQ
             return date.after(after) && date.before(before);
         }
 
-        private String getStringRecord(String command) {
-            switch (command) {
-                case "ip":
-                    return ip;
-                case "user":
-                    return name;
-                case "date":
-                    return df.format(date);
-                case "event":
-                    return event.toString();
-                case "status":
-                    return status.toString();
-            }
-            return "";
+        public int getTask() {
+            return task;
         }
     }
 }
