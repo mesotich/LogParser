@@ -85,7 +85,7 @@ public class LogParser implements QLQuery {
     }
 
     @Override
-    public Set<Object> execute(String query) {
+    public Set<Object> execute(String query) throws IllegalArgumentException {
         int size;
         Set<LogEntry> set;
         initStorage();
@@ -96,7 +96,7 @@ public class LogParser implements QLQuery {
         currentLogs = new HashSet<>();
         String[] fields = query.split(" ", 5);
         if (fields.length != 5)
-            return new HashSet<>();
+            throw new IllegalArgumentException("Неравильный формат запроса");
         List<String> listValues = listValues(query);
         logs.forEach(l -> {
             logEntry = l;
@@ -106,8 +106,7 @@ public class LogParser implements QLQuery {
             }
         });
         size = listValues.size();
-
-        if (size == 2||size==4) {
+        if (size == 2 || size == 4) {
             String field3 = field3(query);
             set = currentLogs;
             currentLogs = new HashSet<>();
