@@ -86,6 +86,8 @@ public class LogParser implements QLQuery {
 
     @Override
     public Set<Object> execute(String query) {
+        int size;
+        Set<LogEntry> set;
         initStorage();
         if (storage.containsQuery(query)) {
             storage.execute(query);
@@ -103,9 +105,25 @@ public class LogParser implements QLQuery {
                 currentLogs.add(l);
             }
         });
-        if (listValues.size() == 3) {
-            Date before = (Date) getValue(Date.class, listValues.get(1));
-            Date after = (Date) getValue(Date.class, listValues.get(2));
+        size = listValues.size();
+
+        if (size == 2||size==4) {
+            String field3 = field3(query);
+            set = currentLogs;
+            currentLogs = new HashSet<>();
+            set.forEach(l -> {
+                logEntry = l;
+                storage.execute(field3);
+                if (field.equals(getValue(field.getClass(), listValues.get(1)))) {
+                    currentLogs.add(l);
+                }
+            });
+        }
+        if (size == 3 || size == 4) {
+            String dateBefore = size == 3 ? listValues.get(1) : listValues.get(2);
+            String dateAfter = size == 3 ? listValues.get(2) : listValues.get(3);
+            Date before = (Date) getValue(Date.class, dateBefore);
+            Date after = (Date) getValue(Date.class, dateAfter);
             currentLogs = currentLogs.stream()
                     .filter(l -> l.betweenDates(before, after))
                     .collect(Collectors.toSet());
@@ -176,6 +194,16 @@ public class LogParser implements QLQuery {
         Matcher matcher = pattern1.matcher(query);
         while (matcher.find()) {
             result.add(query.substring(matcher.start() + 1, matcher.end() - 1));
+        }
+        return result;
+    }
+
+    private String field3(String query) {
+        String result = "";
+        Pattern pattern1 = Pattern.compile("(?<=and\s)\\w+(?=\s=)");
+        Matcher matcher = pattern1.matcher(query);
+        while (matcher.find()) {
+            result = query.substring(matcher.start(), matcher.end());
         }
         return result;
     }
